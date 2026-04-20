@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Noto+Sans+KR:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         :root {
             --bg-primary: #faf8f5;
@@ -424,6 +425,44 @@
             object-position: center top;
         }
 
+        .photo-upload-area {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .photo-upload-area input[type="file"] {
+            display: none;
+        }
+
+        .photo-upload-overlay {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            color: #fff;
+            font-size: 11px;
+            letter-spacing: 0.05em;
+        }
+
+        .photo-upload-area:hover .photo-upload-overlay {
+            opacity: 1;
+        }
+
+        .photo-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 24px;
+        }
+
         .designer-edit-info h3 {
             font-size: 16px;
             font-weight: 500;
@@ -699,6 +738,9 @@
         }
     ];
 
+    // photoData: 업로드된 이미지의 base64 데이터 저장 { filename: base64string }
+    let photoData = {};
+
     let designersData = [
         {
             name: '조안나',
@@ -864,18 +906,47 @@
     }
 
     // ==================== RENDER DESIGNERS ====================
+    function getPhotoSrc(d) {
+        if (photoData[d.photo]) return photoData[d.photo];
+        if (d.photoBase64) return d.photoBase64;
+        if (d.photo) return '../' + d.photo;
+        return '';
+    }
+
+    function handlePhotoUpload(index, input) {
+        const file = input.files[0];
+        if (!file) return;
+        const filename = file.name;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const base64 = e.target.result;
+            designersData[index].photo = filename;
+            designersData[index].photoBase64 = base64;
+            photoData[filename] = base64;
+            renderDesigners();
+            autoSave();
+            showToast('사진이 업로드되었습니다');
+        };
+        reader.readAsDataURL(file);
+    }
+
     function renderDesigners() {
         const container = document.getElementById('designersEditor');
-        container.innerHTML = designersData.map((d, i) => `
+        container.innerHTML = designersData.map((d, i) => {
+            const src = getPhotoSrc(d);
+            return `
             <div class="designer-edit-card">
                 <button class="btn-icon designer-remove-btn" onclick="removeDesigner(${i})" title="삭제">&times;</button>
                 <div class="designer-edit-header">
-                    <div class="designer-edit-avatar">
-                        ${d.photo ? `<img src="../${escHtml(d.photo)}" alt="${escHtml(d.name)}">` : ''}
+                    <div class="designer-edit-avatar photo-upload-area" onclick="document.getElementById('photoInput${i}').click()">
+                        ${src ? `<img src="${src}" alt="${escHtml(d.name)}">` : '<div class="photo-placeholder">+</div>'}
+                        <div class="photo-upload-overlay">${src ? '변경' : '추가'}</div>
+                        <input type="file" id="photoInput${i}" accept="image/*" onchange="handlePhotoUpload(${i}, this)">
                     </div>
                     <div class="designer-edit-info">
                         <h3>${escHtml(d.name) || '새 디자이너'}</h3>
                         <p>${escHtml(d.role)}</p>
+                        ${d.photo ? `<p style="font-size:11px;color:var(--text-muted);margin-top:4px;">${escHtml(d.photo)}</p>` : ''}
                     </div>
                 </div>
                 <div class="form-row" style="margin-bottom:16px;">
@@ -895,25 +966,20 @@
                     <textarea class="form-textarea" rows="2"
                         onchange="designersData[${i}].spec=this.value;autoSave()">${escHtml(d.spec)}</textarea>
                 </div>
-                <div class="form-row" style="margin-bottom:16px;">
-                    <div class="form-group" style="margin-bottom:0;">
-                        <label class="form-label">사진 파일명</label>
-                        <input class="form-input" value="${escHtml(d.photo)}" placeholder="예: photo.png"
-                            onchange="designersData[${i}].photo=this.value;renderDesigners();autoSave()">
-                    </div>
+                <div class="form-row">
                     <div class="form-group" style="margin-bottom:0;">
                         <label class="form-label">인스타그램 핸들</label>
                         <input class="form-input" value="${escHtml(d.instagramHandle)}" placeholder="@username"
                             onchange="designersData[${i}].instagramHandle=this.value;autoSave()">
                     </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label">인스타그램 URL</label>
+                        <input class="form-input" value="${escHtml(d.instagram)}" placeholder="https://www.instagram.com/..."
+                            onchange="designersData[${i}].instagram=this.value;autoSave()">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">인스타그램 URL</label>
-                    <input class="form-input" value="${escHtml(d.instagram)}" placeholder="https://www.instagram.com/..."
-                        onchange="designersData[${i}].instagram=this.value;autoSave()">
-                </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     }
 
     function addDesigner() {
@@ -942,6 +1008,7 @@
         localStorage.setItem('lb_prices', JSON.stringify(priceData));
         localStorage.setItem('lb_services', JSON.stringify(servicesData));
         localStorage.setItem('lb_designers', JSON.stringify(designersData));
+        localStorage.setItem('lb_photos', JSON.stringify(photoData));
         document.getElementById('saveStatus').textContent = '임시 저장됨 — 다운로드하여 적용하세요';
     }
 
@@ -950,9 +1017,11 @@
             const p = localStorage.getItem('lb_prices');
             const s = localStorage.getItem('lb_services');
             const d = localStorage.getItem('lb_designers');
+            const ph = localStorage.getItem('lb_photos');
             if (p) priceData = JSON.parse(p);
             if (s) servicesData = JSON.parse(s);
             if (d) designersData = JSON.parse(d);
+            if (ph) photoData = JSON.parse(ph);
         } catch (e) {}
         renderAll();
     }
@@ -962,6 +1031,7 @@
             localStorage.removeItem('lb_prices');
             localStorage.removeItem('lb_services');
             localStorage.removeItem('lb_designers');
+            localStorage.removeItem('lb_photos');
             location.reload();
         });
     }
@@ -1016,6 +1086,15 @@
         }).join('');
     }
 
+    function base64ToBlob(dataUrl) {
+        const parts = dataUrl.split(',');
+        const mime = parts[0].match(/:(.*?);/)[1];
+        const bytes = atob(parts[1]);
+        const arr = new Uint8Array(bytes.length);
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+        return new Blob([arr], { type: mime });
+    }
+
     async function saveAndDownload() {
         try {
             document.getElementById('saveStatus').textContent = '파일 생성 중...';
@@ -1039,15 +1118,41 @@
                 '<!--DESIGNERS_START-->' + generateDesignersHTML() + '\n            <!--DESIGNERS_END-->'
             );
 
-            const blob = new Blob([html], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'index.html';
-            a.click();
-            URL.revokeObjectURL(url);
+            // 새로 업로드된 사진이 있으면 ZIP으로 다운로드
+            const newPhotos = {};
+            designersData.forEach(d => {
+                if (d.photoBase64 && d.photo) {
+                    newPhotos[d.photo] = d.photoBase64;
+                }
+            });
 
-            showToast('index.html 파일이 다운로드되었습니다');
+            const hasNewPhotos = Object.keys(newPhotos).length > 0;
+
+            if (hasNewPhotos) {
+                const zip = new JSZip();
+                zip.file('index.html', html);
+                for (const [filename, base64] of Object.entries(newPhotos)) {
+                    zip.file(filename, base64ToBlob(base64));
+                }
+                const content = await zip.generateAsync({ type: 'blob' });
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'lebouton-update.zip';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('ZIP 파일이 다운로드되었습니다 (index.html + 사진)');
+            } else {
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'index.html';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('index.html 파일이 다운로드되었습니다');
+            }
+
             document.getElementById('saveStatus').textContent = '다운로드 완료!';
         } catch (err) {
             showToast('오류가 발생했습니다: ' + err.message);
