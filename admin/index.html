@@ -982,7 +982,6 @@
                     <span class="price-value">${escHtml(item.price)}</span>
                 </div>`).join('');
             return `
-            <!-- ${cat.category.toUpperCase()} -->
             <div class="price-category reveal">
                 <h3 class="price-category-title">${escHtml(cat.category)}</h3>${rows}
             </div>`;
@@ -1021,33 +1020,25 @@
         try {
             document.getElementById('saveStatus').textContent = '파일 생성 중...';
 
-            // Fetch the current index.html
             const response = await fetch('/index.html');
             let html = await response.text();
 
-            // Replace price section content
-            const priceRegex = /(<!-- CUT -->[\s\S]*?)(<p class="price-note)/;
-            const newPriceContent = generatePriceHTML() + '\n            ';
-            html = html.replace(priceRegex, newPriceContent + '$2');
+            // 마커 기반으로 각 섹션 교체
+            html = html.replace(
+                /<!--PRICE_START-->[\s\S]*?<!--PRICE_END-->/,
+                '<!--PRICE_START-->' + generatePriceHTML() + '\n            <!--PRICE_END-->'
+            );
 
-            // If the above didn't match, try alternative pattern
-            if (html.includes('<!-- CUT -->')) {
-                // Already replaced
-            } else {
-                // Replace between price-container and price-note
-                const priceContainerRegex = /(<div class="price-container">)\s*[\s\S]*?(<p class="price-note)/;
-                html = html.replace(priceContainerRegex, '$1' + newPriceContent + '$2');
-            }
+            html = html.replace(
+                /<!--SERVICES_START-->[\s\S]*?<!--SERVICES_END-->/,
+                '<!--SERVICES_START-->' + generateServicesHTML() + '\n            <!--SERVICES_END-->'
+            );
 
-            // Replace services grid content
-            const servicesRegex = /(<div class="services-grid">)\s*[\s\S]*?(<\/div>\s*<\/section>\s*<!-- PRICE -->)/;
-            html = html.replace(servicesRegex, '$1' + generateServicesHTML() + '\n        </div>\n    </section>\n\n    <!-- PRICE -->');
+            html = html.replace(
+                /<!--DESIGNERS_START-->[\s\S]*?<!--DESIGNERS_END-->/,
+                '<!--DESIGNERS_START-->' + generateDesignersHTML() + '\n            <!--DESIGNERS_END-->'
+            );
 
-            // Replace designers grid content
-            const designersRegex = /(<div class="designers-grid">)\s*[\s\S]*?(<\/div>\s*<\/section>\s*<!-- FACILITIES -->)/;
-            html = html.replace(designersRegex, '$1' + generateDesignersHTML() + '\n        </div>\n    </section>\n\n    <!-- FACILITIES -->');
-
-            // Download
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
