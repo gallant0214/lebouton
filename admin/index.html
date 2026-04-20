@@ -615,7 +615,6 @@
         <button class="tab-btn active" onclick="switchTab('price')">가격 관리</button>
         <button class="tab-btn" onclick="switchTab('services')">메뉴 관리</button>
         <button class="tab-btn" onclick="switchTab('designers')">디자이너 관리</button>
-        <button class="tab-btn" onclick="switchTab('settings')">설정</button>
     </div>
 
     <!-- CONTENT -->
@@ -663,19 +662,6 @@
             </div>
         </div>
 
-        <!-- SETTINGS TAB -->
-        <div class="tab-panel" id="tab-settings">
-            <h2 class="panel-title">설정</h2>
-            <p class="panel-desc">GitHub 연동 설정 (최초 1회만 입력하면 됩니다)</p>
-            <div class="edit-card">
-                <div class="form-group">
-                    <label class="form-label">GitHub Personal Access Token</label>
-                    <input class="form-input" type="password" id="ghTokenInput" placeholder="ghp_로 시작하는 토큰을 입력하세요">
-                </div>
-                <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px;">토큰은 브라우저에만 저장되며 외부로 전송되지 않습니다 (GitHub API 직접 호출)</p>
-                <button class="btn btn-primary" onclick="saveGhToken()">토큰 저장</button>
-            </div>
-        </div>
     </div>
 
     <!-- TOAST -->
@@ -699,6 +685,9 @@
     const GH_OWNER = 'gallant0214';
     const GH_REPO = 'lebouton';
     const GH_BRANCH = 'master';
+    // 토큰은 최초 1회 입력 후 브라우저에 저장됩니다
+    function getGhTokenStored() { return localStorage.getItem('lb_gh_tk') || ''; }
+    function setGhTokenStored(t) { localStorage.setItem('lb_gh_tk', t); }
 
     let priceData = [
         {
@@ -810,15 +799,8 @@
         }
     }
 
-    function saveGhToken() {
-        const token = document.getElementById('ghTokenInput').value.trim();
-        if (!token) { showToast('토큰을 입력하세요'); return; }
-        localStorage.setItem('lb_gh_token', token);
-        showToast('토큰이 저장되었습니다');
-    }
-
     function getGhToken() {
-        return localStorage.getItem('lb_gh_token') || '';
+        return getGhTokenStored();
     }
 
     function logout() {
@@ -1154,13 +1136,11 @@
     }
 
     async function saveToGitHub(section) {
-        const token = getGhToken();
+        let token = getGhToken();
         if (!token) {
-            showToast('설정 탭에서 GitHub 토큰을 먼저 입력하세요');
-            switchTab('settings');
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-btn')[3].classList.add('active');
-            return;
+            token = prompt('GitHub 토큰을 입력하세요 (최초 1회만 입력하면 됩니다):');
+            if (!token) { showToast('토큰이 필요합니다'); return; }
+            setGhTokenStored(token);
         }
 
         const btnId = section === 'price' ? 'priceSaveBtn' : section === 'services' ? 'servicesSaveBtn' : 'designersSaveBtn';
@@ -1269,11 +1249,6 @@
 
     // ==================== INIT ====================
     loadSavedData();
-    // Load saved token into settings input
-    const savedToken = getGhToken();
-    if (savedToken) {
-        document.getElementById('ghTokenInput').value = savedToken;
-    }
     </script>
 </body>
 </html>
