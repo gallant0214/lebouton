@@ -1015,6 +1015,8 @@
             designersData.splice(i, 1);
             renderDesigners();
             autoSave();
+            showToast('삭제됨 — GitHub에 자동 저장 중입니다. 잠시 후 사이트에 반영됩니다.');
+            saveToGitHub('designers');
         });
     }
 
