@@ -508,6 +508,23 @@
             transform: translateY(0);
         }
 
+        .toast.error {
+            background: #c0392b;
+            font-size: 14px;
+            padding: 18px 32px;
+            max-width: 420px;
+            cursor: pointer;
+            pointer-events: auto;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .toast.error::after {
+            content: ' ✕';
+            opacity: 0.7;
+            margin-left: 8px;
+        }
+
         /* Floating save bar */
         .save-bar {
             position: fixed;
@@ -1106,85 +1123,139 @@
     // ==================== GITHUB API ====================
     async function ghApiGet(path, token) {
         const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/${path}`, {
-            headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json' }
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
         });
-        if (!res.ok) throw new Error(`GitHub API 오류: ${res.status}`);
+        if (!res.ok) {
+            let detail = '';
+            try { const j = await res.json(); detail = j.message || ''; } catch (e) {}
+            const err = new Error(`[GET ${path}] HTTP ${res.status}${detail ? ' — ' + detail : ''}`);
+            err.status = res.status;
+            throw err;
+        }
         return res.json();
     }
 
     async function ghApiPut(path, token, body) {
         const res = await fetch(`https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/${path}`, {
             method: 'PUT',
-            headers: { 'Authorization': `token ${token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || `GitHub API 오류: ${res.status}`);
+            let detail = '';
+            try { const j = await res.json(); detail = j.message || ''; } catch (e) {}
+            const err = new Error(`[PUT ${path}] HTTP ${res.status}${detail ? ' — ' + detail : ''}`);
+            err.status = res.status;
+            throw err;
         }
         return res.json();
     }
 
+    async function validateGhToken(token) {
+        const res = await fetch('https://api.github.com/user', {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+        });
+        if (!res.ok) {
+            let detail = '';
+            try { const j = await res.json(); detail = j.message || ''; } catch (e) {}
+            throw new Error(`토큰 검증 실패 (HTTP ${res.status}) ${detail}`);
+        }
+        const u = await res.json();
+        return u.login;
+    }
+
     function utf8ToBase64(str) {
-        return btoa(unescape(encodeURIComponent(str)));
+        const bytes = new TextEncoder().encode(str);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
     }
 
     function base64ToUtf8(b64) {
-        return decodeURIComponent(escape(atob(b64)));
+        const bin = atob(b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return new TextDecoder().decode(bytes);
     }
 
     function dataUrlToRawBase64(dataUrl) {
         return dataUrl.split(',')[1];
     }
 
-    async function saveToGitHub(section) {
+    async function ensureGhToken() {
         let token = getGhToken();
-        if (!token) {
-            token = prompt('GitHub 토큰을 입력하세요 (최초 1회만 입력하면 됩니다):');
-            if (!token) { showToast('토큰이 필요합니다'); return; }
+        if (token) return token;
+        const raw = prompt('GitHub 토큰을 입력하세요 (최초 1회만 입력하면 됩니다):');
+        if (!raw) { showError('토큰이 입력되지 않았습니다.'); return null; }
+        token = raw.trim();
+        try {
+            const login = await validateGhToken(token);
             setGhTokenStored(token);
+            showToast(`토큰 검증 완료 (${login})`);
+            return token;
+        } catch (err) {
+            console.error('Token validation failed:', err);
+            showError('토큰이 잘못되었거나 권한이 부족합니다.\n' + err.message + '\n\n다시 발급받아 입력하세요.');
+            return null;
         }
+    }
+
+    function buildUpdatedHtml(originalHtml, section) {
+        let html = originalHtml;
+        if (section === 'price' || section === 'all') {
+            html = html.replace(
+                /<!--PRICE_START-->[\s\S]*?<!--PRICE_END-->/,
+                '<!--PRICE_START-->' + generatePriceHTML() + '\n            <!--PRICE_END-->'
+            );
+        }
+        if (section === 'services' || section === 'all') {
+            html = html.replace(
+                /<!--SERVICES_START-->[\s\S]*?<!--SERVICES_END-->/,
+                '<!--SERVICES_START-->' + generateServicesHTML() + '\n            <!--SERVICES_END-->'
+            );
+        }
+        if (section === 'designers' || section === 'all') {
+            html = html.replace(
+                /<!--DESIGNERS_START-->[\s\S]*?<!--DESIGNERS_END-->/,
+                '<!--DESIGNERS_START-->' + generateDesignersHTML() + '\n            <!--DESIGNERS_END-->'
+            );
+        }
+        return html;
+    }
+
+    async function saveToGitHub(section) {
+        const token = await ensureGhToken();
+        if (!token) return;
 
         const btnId = section === 'price' ? 'priceSaveBtn' : section === 'services' ? 'servicesSaveBtn' : 'designersSaveBtn';
         const btn = document.getElementById(btnId);
-        const origText = btn.textContent;
-        btn.textContent = '저장 중...';
-        btn.disabled = true;
+        const origText = btn ? btn.textContent : '';
+        if (btn) { btn.textContent = '저장 중...'; btn.disabled = true; }
+
+        const sectionNames = { price: '가격', services: '메뉴', designers: '디자이너' };
 
         try {
-            // 1. 현재 index.html 가져오기
-            const fileData = await ghApiGet(`contents/index.html?ref=${GH_BRANCH}`, token);
-            let html = base64ToUtf8(fileData.content.replace(/\n/g, ''));
-            const sha = fileData.sha;
-
-            // 2. 해당 섹션 교체
-            if (section === 'price' || section === 'all') {
-                html = html.replace(
-                    /<!--PRICE_START-->[\s\S]*?<!--PRICE_END-->/,
-                    '<!--PRICE_START-->' + generatePriceHTML() + '\n            <!--PRICE_END-->'
-                );
+            // 1. 현재 index.html 가져오기 → 2. 섹션 교체 → 3. 커밋. 409 충돌 시 1회 재시도
+            const commitWithSha = async () => {
+                const fileData = await ghApiGet(`contents/index.html?ref=${GH_BRANCH}`, token);
+                const html = buildUpdatedHtml(base64ToUtf8(fileData.content.replace(/\n/g, '')), section);
+                return ghApiPut('contents/index.html', token, {
+                    message: `관리자: ${sectionNames[section] || section} 정보 업데이트`,
+                    content: utf8ToBase64(html),
+                    sha: fileData.sha,
+                    branch: GH_BRANCH
+                });
+            };
+            try {
+                await commitWithSha();
+            } catch (err) {
+                if (err.status === 409 || err.status === 422) {
+                    console.warn('SHA conflict, retrying with fresh sha:', err);
+                    await commitWithSha();
+                } else {
+                    throw err;
+                }
             }
-            if (section === 'services' || section === 'all') {
-                html = html.replace(
-                    /<!--SERVICES_START-->[\s\S]*?<!--SERVICES_END-->/,
-                    '<!--SERVICES_START-->' + generateServicesHTML() + '\n            <!--SERVICES_END-->'
-                );
-            }
-            if (section === 'designers' || section === 'all') {
-                html = html.replace(
-                    /<!--DESIGNERS_START-->[\s\S]*?<!--DESIGNERS_END-->/,
-                    '<!--DESIGNERS_START-->' + generateDesignersHTML() + '\n            <!--DESIGNERS_END-->'
-                );
-            }
-
-            // 3. index.html 커밋
-            const sectionNames = { price: '가격', services: '메뉴', designers: '디자이너' };
-            await ghApiPut('contents/index.html', token, {
-                message: `관리자: ${sectionNames[section]} 정보 업데이트`,
-                content: utf8ToBase64(html),
-                sha: sha,
-                branch: GH_BRANCH
-            });
 
             // 4. 디자이너 사진 업로드 (새로 추가된 것만)
             if (section === 'designers') {
@@ -1212,10 +1283,19 @@
             autoSave();
             showToast('저장 완료! 잠시 후 사이트에 반영됩니다');
         } catch (err) {
-            showToast('저장 실패: ' + err.message);
+            console.error('saveToGitHub failed:', err);
+            let hint = '';
+            if (err.status === 401 || err.status === 403) {
+                localStorage.removeItem('lb_gh_tk');
+                hint = '\n\n저장된 토큰을 지웠습니다. 다음 저장 시 새 토큰 입력창이 다시 나타납니다.';
+            } else if (err.status === 404) {
+                hint = '\n\n저장소 또는 파일 경로를 찾을 수 없습니다.';
+            } else if (err.status === 422) {
+                hint = '\n\n요청 형식 오류 — 다시 시도해 주세요.';
+            }
+            showError('저장 실패\n' + err.message + hint + '\n\n(이 메시지를 클릭하면 닫힙니다)');
         } finally {
-            btn.textContent = origText;
-            btn.disabled = false;
+            if (btn) { btn.textContent = origText; btn.disabled = false; }
         }
     }
 
@@ -1225,11 +1305,30 @@
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    let toastTimer = null;
     function showToast(msg) {
         const toast = document.getElementById('toast');
+        if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
         toast.textContent = msg;
+        toast.classList.remove('error');
         toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3000);
+        toast.onclick = null;
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 3500);
+    }
+
+    function showError(msg) {
+        const toast = document.getElementById('toast');
+        if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+        toast.textContent = msg;
+        toast.classList.add('error', 'show');
+        toast.onclick = () => {
+            toast.classList.remove('show');
+            toast.onclick = null;
+        };
+        toastTimer = setTimeout(() => {
+            toast.classList.remove('show');
+            toast.onclick = null;
+        }, 20000);
     }
 
     let pendingAction = null;
