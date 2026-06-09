@@ -1043,7 +1043,8 @@
         localStorage.setItem('lb_services', JSON.stringify(servicesData));
         localStorage.setItem('lb_designers', JSON.stringify(designersData));
         localStorage.setItem('lb_photos', JSON.stringify(photoData));
-        document.getElementById('saveStatus').textContent = '임시 저장됨 — 다운로드하여 적용하세요';
+        const status = document.getElementById('saveStatus');
+        if (status) status.textContent = '임시 저장됨';
     }
 
     function loadSavedData() {
