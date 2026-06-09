@@ -632,6 +632,7 @@
         <button class="tab-btn active" onclick="switchTab('price')">가격 관리</button>
         <button class="tab-btn" onclick="switchTab('services')">메뉴 관리</button>
         <button class="tab-btn" onclick="switchTab('designers')">디자이너 관리</button>
+        <button class="tab-btn" onclick="switchTab('contact')">가게 정보</button>
     </div>
 
     <!-- CONTENT -->
@@ -676,6 +677,48 @@
             <div style="margin-top:32px;display:flex;gap:12px;justify-content:flex-end;">
                 <button class="btn btn-outline" onclick="resetData()">초기화</button>
                 <button class="btn btn-primary" id="designersSaveBtn" onclick="saveToGitHub('designers')">저장</button>
+            </div>
+        </div>
+
+        <!-- CONTACT TAB -->
+        <div class="tab-panel" id="tab-contact">
+            <h2 class="panel-title">가게 정보</h2>
+            <p class="panel-desc">가게 주소, 전화번호, 영업시간, 이메일 등 기본 정보를 수정할 수 있습니다. 전화번호와 이메일은 페이지 전체에 자동 반영됩니다.</p>
+            <div class="edit-card">
+                <div style="margin-bottom:18px;">
+                    <label class="form-label">전화번호 (예: 0507-1352-9736)</label>
+                    <input class="form-input" id="contactPhone" placeholder="0507-1352-9736"
+                        onchange="contactData.phone=this.value;autoSave()">
+                </div>
+                <div style="margin-bottom:18px;">
+                    <label class="form-label">주소 (줄바꿈하면 두 줄로 표시)</label>
+                    <textarea class="form-textarea" id="contactAddress" placeholder="대구 수성구 범어천로 155-1&#10;에파빌딩 2층"
+                        onchange="contactData.address=this.value;autoSave()"></textarea>
+                </div>
+                <div style="margin-bottom:18px;">
+                    <label class="form-label">영업시간</label>
+                    <input class="form-input" id="contactHours" placeholder="매일 10:00 — 20:00"
+                        onchange="contactData.hours=this.value;autoSave()">
+                </div>
+                <div style="margin-bottom:18px;">
+                    <label class="form-label">이메일</label>
+                    <input class="form-input" id="contactEmail" placeholder="lebouton0720@naver.com"
+                        onchange="contactData.email=this.value;autoSave()">
+                </div>
+                <div style="margin-bottom:18px;">
+                    <label class="form-label">찾아오시는 길</label>
+                    <textarea class="form-textarea" id="contactDirections" style="min-height:120px;"
+                        onchange="contactData.directions=this.value;autoSave()"></textarea>
+                </div>
+                <div>
+                    <label class="form-label">주차 안내</label>
+                    <textarea class="form-textarea" id="contactParking" style="min-height:100px;"
+                        onchange="contactData.parking=this.value;autoSave()"></textarea>
+                </div>
+            </div>
+            <div style="margin-top:32px;display:flex;gap:12px;justify-content:flex-end;">
+                <button class="btn btn-outline" onclick="resetData()">초기화</button>
+                <button class="btn btn-primary" id="contactSaveBtn" onclick="saveToGitHub('contact')">저장</button>
             </div>
         </div>
 
@@ -768,6 +811,15 @@
 
     // photoData: 업로드된 이미지의 base64 데이터 저장 { filename: base64string }
     let photoData = {};
+
+    let contactData = {
+        phone: '0507-1352-9736',
+        address: '대구 수성구 범어천로 155-1\n에파빌딩 2층',
+        hours: '매일 10:00 — 20:00',
+        email: 'lebouton0720@naver.com',
+        directions: '범어역 1번 출구에서 도보 3~5분\n커피맛을조금아는남자 옆 옆 건물\n\n범어네거리에서 수성교 방향,\n복개도로로 우회전',
+        parking: '건물 주차장 이용 불가\n바로 앞 공영주차장 이용\n대중교통 이용을 권장합니다'
+    };
 
     let designersData = [
         {
@@ -1037,12 +1089,24 @@
         });
     }
 
+    // ==================== RENDER CONTACT ====================
+    function renderContact() {
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+        set('contactPhone', contactData.phone);
+        set('contactAddress', contactData.address);
+        set('contactHours', contactData.hours);
+        set('contactEmail', contactData.email);
+        set('contactDirections', contactData.directions);
+        set('contactParking', contactData.parking);
+    }
+
     // ==================== SAVE / LOAD ====================
     function autoSave() {
         localStorage.setItem('lb_prices', JSON.stringify(priceData));
         localStorage.setItem('lb_services', JSON.stringify(servicesData));
         localStorage.setItem('lb_designers', JSON.stringify(designersData));
         localStorage.setItem('lb_photos', JSON.stringify(photoData));
+        localStorage.setItem('lb_contact', JSON.stringify(contactData));
         const status = document.getElementById('saveStatus');
         if (status) status.textContent = '임시 저장됨';
     }
@@ -1053,10 +1117,12 @@
             const s = localStorage.getItem('lb_services');
             const d = localStorage.getItem('lb_designers');
             const ph = localStorage.getItem('lb_photos');
+            const c = localStorage.getItem('lb_contact');
             if (p) priceData = JSON.parse(p);
             if (s) servicesData = JSON.parse(s);
             if (d) designersData = JSON.parse(d);
             if (ph) photoData = JSON.parse(ph);
+            if (c) contactData = Object.assign(contactData, JSON.parse(c));
         } catch (e) {}
         renderAll();
     }
@@ -1067,6 +1133,7 @@
             localStorage.removeItem('lb_services');
             localStorage.removeItem('lb_designers');
             localStorage.removeItem('lb_photos');
+            localStorage.removeItem('lb_contact');
             location.reload();
         });
     }
@@ -1075,6 +1142,7 @@
         renderPrices();
         renderServices();
         renderDesigners();
+        renderContact();
     }
 
     // ==================== GENERATE HTML ====================
@@ -1119,6 +1187,41 @@
                 </div>
             </div>`;
         }).join('');
+    }
+
+    function generateContactHTML() {
+        const phoneEsc = escHtml(contactData.phone);
+        const addrHtml = escHtml(contactData.address).replace(/\n/g, '<br>');
+        const dirHtml = escHtml(contactData.directions).replace(/\n/g, '<br>');
+        const parkHtml = escHtml(contactData.parking).replace(/\n/g, '<br>');
+        return `
+            <div class="access-info reveal">
+                <h3>Information</h3>
+                <dl class="access-detail">
+                    <dt>Address</dt>
+                    <dd>${addrHtml}</dd>
+                </dl>
+                <dl class="access-detail">
+                    <dt>Tel</dt>
+                    <dd><a href="tel:${phoneEsc}" style="color: var(--text-primary); text-decoration: none;">${phoneEsc}</a></dd>
+                </dl>
+                <dl class="access-detail">
+                    <dt>Hours</dt>
+                    <dd>${escHtml(contactData.hours)}</dd>
+                </dl>
+                <dl class="access-detail">
+                    <dt>Email</dt>
+                    <dd>${escHtml(contactData.email)}</dd>
+                </dl>
+                <div class="access-directions">
+                    <h4>찾아오시는 길</h4>
+                    <p>${dirHtml}</p>
+                </div>
+                <div class="access-directions" style="margin-top: 12px;">
+                    <h4>주차 안내</h4>
+                    <p>${parkHtml}</p>
+                </div>
+            </div>`;
     }
 
     // ==================== GITHUB API ====================
@@ -1221,6 +1324,19 @@
                 '<!--DESIGNERS_START-->' + generateDesignersHTML() + '\n            <!--DESIGNERS_END-->'
             );
         }
+        if (section === 'contact' || section === 'all') {
+            // 1. 마커 블록 (visible Information 영역) 교체
+            html = html.replace(
+                /<!--CONTACT_START-->[\s\S]*?<!--CONTACT_END-->/,
+                '<!--CONTACT_START-->' + generateContactHTML() + '\n            <!--CONTACT_END-->'
+            );
+            // 2. 페이지 다른 곳에 흩어진 전화번호 / 이메일 동기화 (CTA 버튼, JSON-LD 등)
+            const phoneEscJson = (contactData.phone || '').replace(/"/g, '\\"');
+            const emailEscJson = (contactData.email || '').replace(/"/g, '\\"');
+            html = html.replace(/href="tel:[^"]*"/g, `href="tel:${contactData.phone || ''}"`);
+            html = html.replace(/"telephone"\s*:\s*"[^"]*"/g, `"telephone": "${phoneEscJson}"`);
+            html = html.replace(/"email"\s*:\s*"[^"]*"/g, `"email": "${emailEscJson}"`);
+        }
         return html;
     }
 
@@ -1228,12 +1344,15 @@
         const token = await ensureGhToken();
         if (!token) return;
 
-        const btnId = section === 'price' ? 'priceSaveBtn' : section === 'services' ? 'servicesSaveBtn' : 'designersSaveBtn';
+        const btnId = section === 'price' ? 'priceSaveBtn'
+            : section === 'services' ? 'servicesSaveBtn'
+            : section === 'contact' ? 'contactSaveBtn'
+            : 'designersSaveBtn';
         const btn = document.getElementById(btnId);
         const origText = btn ? btn.textContent : '';
         if (btn) { btn.textContent = '저장 중...'; btn.disabled = true; }
 
-        const sectionNames = { price: '가격', services: '메뉴', designers: '디자이너' };
+        const sectionNames = { price: '가격', services: '메뉴', designers: '디자이너', contact: '가게정보' };
 
         try {
             // 1. 현재 index.html 가져오기 → 2. 섹션 교체 → 3. 커밋. 409 충돌 시 1회 재시도
