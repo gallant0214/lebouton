@@ -598,14 +598,16 @@
         }
 
         .designers-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
             gap: 24px;
             max-width: 1040px;
             margin: 0 auto;
         }
 
         .designer-card {
+            flex: 0 1 calc(25% - 18px);
             text-align: center;
             padding: 44px 20px;
             background: var(--bg-card);
@@ -955,8 +957,8 @@
 
         /* ===== RESPONSIVE ===== */
         @media (max-width: 1024px) {
-            .designers-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .designer-card {
+                flex: 0 1 calc(50% - 12px);
             }
         }
 
@@ -1016,8 +1018,10 @@
             }
 
             .designers-grid {
-                grid-template-columns: repeat(2, 1fr);
                 gap: 16px;
+            }
+            .designer-card {
+                flex: 0 1 calc(50% - 8px);
             }
 
             .access-content {
@@ -1047,8 +1051,8 @@
         }
 
         @media (max-width: 480px) {
-            .designers-grid {
-                grid-template-columns: 1fr;
+            .designer-card {
+                flex: 0 1 100%;
             }
 
             .hero-sub br {
